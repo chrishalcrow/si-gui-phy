@@ -8,7 +8,7 @@ authors = [
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "numba==0.61",
+    "numba>=0.61",
     "pyqt5>=5.15.11",
     "pyqtgraph>=0.13.7",
     "spikeinterface-gui",
@@ -23,3 +23,4 @@ build-backend = "hatchling.build"
 
 [tool.uv.sources]
 spikeinterface-gui = { git = "https://github.com/SpikeInterface/spikeinterface-gui.git" }
+
