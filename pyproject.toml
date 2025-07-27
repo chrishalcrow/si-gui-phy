@@ -1,0 +1,25 @@
+[project]
+name = "si-gui-phy"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "chrishalcrow", email = "chrishalcrow@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "numba==0.61",
+    "pyqt5>=5.15.11",
+    "pyqtgraph>=0.13.7",
+    "spikeinterface-gui",
+]
+
+[project.scripts]
+si-gui-phy = "si_gui_phy:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv.sources]
+spikeinterface-gui = { git = "https://github.com/SpikeInterface/spikeinterface-gui.git" }
