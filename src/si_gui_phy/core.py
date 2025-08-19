@@ -9,31 +9,36 @@ from probeinterface import read_prb
 from spikeinterface.core import (
     ChannelSparsity,
     SortingAnalyzer,
+    ComputeTemplates,
     create_sorting_analyzer,
     generate_ground_truth_recording,
     set_global_job_kwargs,
 )
 from spikeinterface.extractors import read_phy
-
+from spikeinterface.postprocessing import ComputeSpikeLocations, ComputeSpikeAmplitudes
 
 def make_amplitudes(sa: SortingAnalyzer, phy_path: Path):
 
-    amps_folder = Path(sa.folder) / "extensions" / "spike_amplitudes"
-    amps_folder.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(phy_path/"amplitudes.npy", amps_folder / "amplitudes.npy")
+    amplitudes_extension = ComputeSpikeAmplitudes(sa)
 
-    make_run_info(amps_folder)
+    amps_np = np.load(phy_path / "amplitudes.npy")
+
+    amplitudes_extension.data = {}
+    amplitudes_extension.data["amplitudes"] = amps_np
 
     params = {
         "peak_sign": "pos"
     }
-    make_params(amps_folder, params)
+    amplitudes_extension.params = params
+
+    amplitudes_extension.run_info = {'run_completed': True}
+
+    sa.extensions['amplitudes'] = amplitudes_extension
 
 
 def make_locations(sa, phy_path):
 
-    locs_folder: Path = sa.folder / "extensions" / "spike_locations"
-    locs_folder.mkdir(parents=True, exist_ok=True)
+    locations_extension = ComputeSpikeLocations(sa)
 
     locs_np = np.load(phy_path / "spike_positions.npy")
 
@@ -46,13 +51,15 @@ def make_locations(sa, phy_path):
     for a, column_name in enumerate(column_names):
         structured_array[column_name] = locs_np[:,a]
 
-    # Save as new .npy file
-    np.save(locs_folder / "spike_locations.npy", structured_array)
-
-    make_run_info(locs_folder)
+    locations_extension.data = {}
+    locations_extension.data["spike_locations"] = structured_array
 
     params = {}
-    make_params(locs_folder, params)
+    locations_extension.params = params
+
+    locations_extension.run_info = {'run_completed': True}
+
+    sa.extensions['spike_locations'] = locations_extension
 
 
 def make_sparsity(sort, rec, phy_path):
@@ -68,17 +75,13 @@ def make_sparsity(sort, rec, phy_path):
 
 def make_templates(sa, phy_path, mask, unwhiten=True):
 
-    templates_folder = Path(sa.folder) / Path("extensions/templates")
-    templates_folder.mkdir(parents=True, exist_ok=True)
+    template_extension = ComputeTemplates(sa)
 
     whitened_templates = np.load(phy_path / "templates.npy")
     wh_inv = np.load(phy_path / "whitening_mat_inv.npy")
-
     new_templates = compute_unwhitened_templates(whitened_templates, wh_inv, mask) if unwhiten else whitened_templates
 
-    np.save(templates_folder / "average.npy", new_templates)
-
-    make_run_info(templates_folder)
+    template_extension.data = {'average': new_templates}
 
     params = {
         "operators": ["average"],
@@ -86,8 +89,12 @@ def make_templates(sa, phy_path, mask, unwhiten=True):
         "ms_after": 1.06,
         "peak_sign": "pos",
     }
-    make_params(templates_folder, params)
 
+    template_extension.params = params
+    template_extension.run_info = {'run_completed': True}
+
+    sa.extensions['templates'] = template_extension
+    
 
 @njit()
 def compute_unwhitened_templates(whitened_templates, wh_inv, mask):
@@ -142,10 +149,11 @@ def analyzer_from_phy(phy_path) -> SortingAnalyzer:
     sparsity = make_sparsity(sort, recording, phy_path)
 
     print("Creating a temporary analyzer...")
-    sa = create_sorting_analyzer(sort,recording, format="binary_folder", folder="temp_analyzer", overwrite=True, sparse=True, sparsity=sparsity)
+    sa = create_sorting_analyzer(sort,recording, sparse=True, sparsity=sparsity)
 
     print("Copying and reformatting templates", end="", flush=True)
     sa.compute("random_spikes")
+
     make_templates(sa, phy_path, sparsity.mask, unwhiten=True)
     print(", locations", end="", flush=True)
     make_locations(sa, phy_path)
@@ -176,6 +184,6 @@ def analyzer_from_phy(phy_path) -> SortingAnalyzer:
     siqm.compute_synchrony_metrics(sa)
     siqm.compute_firing_ranges(sa)
 
-    #sa._recording = None
+    sa._recording = None
 
     return sa
