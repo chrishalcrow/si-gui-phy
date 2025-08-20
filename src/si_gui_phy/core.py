@@ -15,7 +15,7 @@ from spikeinterface.core import (
     set_global_job_kwargs,
 )
 from spikeinterface.extractors import read_phy
-from spikeinterface.postprocessing import ComputeSpikeLocations, ComputeSpikeAmplitudes
+from spikeinterface.postprocessing import ComputeSpikeLocations, ComputeSpikeAmplitudes, ComputePrincipalComponents
 
 def make_amplitudes(sa: SortingAnalyzer, phy_path: Path):
 
@@ -61,6 +61,26 @@ def make_locations(sa, phy_path):
 
     sa.extensions['spike_locations'] = locations_extension
 
+# Not working yet!
+def make_principal_components(sa, phy_path):
+    
+    random_ext = sa.get_extension("random_spikes")
+    random_spikes_indices = random_ext.data['random_spikes_indices']
+    
+    locations_extension = ComputePrincipalComponents(sa)
+
+    pc_np = np.load(phy_path / "pc_features.npy")
+    pc_np_downsample = pc_np[random_spikes_indices]
+
+    locations_extension.data = {}
+    locations_extension.data["pca_projection"] = pc_np_downsample
+
+    params = {'mode': 'by_channel_local'}
+    locations_extension.params = params
+
+    locations_extension.run_info = {'run_completed': True}
+
+    sa.extensions['principal_components'] = locations_extension
 
 def make_sparsity(sort, rec, phy_path):
 
@@ -83,10 +103,27 @@ def make_templates(sa, phy_path, mask, unwhiten=True):
 
     template_extension.data = {'average': new_templates}
 
+    ops_path = phy_path / "ops.npy"
+    if ops_path.is_file():
+        ops = np.load(ops_path, allow_pickle=True)
+        
+        samples_before = ops.item(0).get('nt0min')
+        nt = ops.item(0).get('nt')
+
+        samples_after = nt - samples_before
+
+        ms_before = samples_before/30
+        ms_after = samples_after/30
+    
+    else:
+        ms_before = 2/3
+        ms_after = 4/3
+
+
     params = {
         "operators": ["average"],
-        "ms_before": 1.0,
-        "ms_after": 1.06,
+        "ms_before": ms_before,
+        "ms_after": ms_after,
         "peak_sign": "pos",
     }
 
@@ -148,7 +185,7 @@ def analyzer_from_phy(phy_path) -> SortingAnalyzer:
 
     sparsity = make_sparsity(sort, recording, phy_path)
 
-    print("Creating a temporary analyzer...")
+    print("Initialising analyzer...")
     sa = create_sorting_analyzer(sort,recording, sparse=True, sparsity=sparsity)
 
     print("Copying and reformatting templates", end="", flush=True)
@@ -157,7 +194,11 @@ def analyzer_from_phy(phy_path) -> SortingAnalyzer:
     make_templates(sa, phy_path, sparsity.mask, unwhiten=True)
     print(", locations", end="", flush=True)
     make_locations(sa, phy_path)
-    print(" and ampltides...", flush=True)
+
+    # print(" and principal components.", end="", flush=True)
+    # make_principal_components(sa, phy_path)
+
+    print(" and amplitudes.", flush=True)
     make_amplitudes(sa, phy_path)
 
     print("Computing unit locations", flush=True, end="")
@@ -175,7 +216,7 @@ def analyzer_from_phy(phy_path) -> SortingAnalyzer:
     print(", template_metrics", flush=True, end="")
     sa.compute("template_metrics", include_multi_channel_metrics=True)
 
-    print(" and some quality metrics...", flush=True, end="")
+    print(" and some quality metrics...", flush=True)
 
     siqm.compute_firing_rates(sa)
     siqm.compute_presence_ratios(sa)
