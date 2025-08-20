@@ -33,7 +33,7 @@ def make_amplitudes(sa: SortingAnalyzer, phy_path: Path):
 
     amplitudes_extension.run_info = {'run_completed': True}
 
-    sa.extensions['amplitudes'] = amplitudes_extension
+    sa.extensions['spike_amplitudes'] = amplitudes_extension
 
 
 def make_locations(sa, phy_path):

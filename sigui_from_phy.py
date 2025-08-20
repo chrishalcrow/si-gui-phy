@@ -12,4 +12,15 @@ if phy_path.is_dir() is False:
 
 sa = analyzer_from_phy(phy_path=phy_path)
 
-run_mainwindow(sa, mode="desktop", layout_preset="legacy")
+layout_dict = {
+    "zone1": ["similarity"], 
+    "zone2": ["unitlist","mergelist"], 
+    "zone3": ["waveform"], 
+    "zone4": ["probe"], 
+    "zone5": ["spikeamplitude"], 
+    "zone6": [], 
+    "zone7": [], 
+    "zone8": ["correlogram"]
+}
+
+run_mainwindow(sa, mode="desktop", layout=layout_dict, curation=True)
