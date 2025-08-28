@@ -173,7 +173,6 @@ def analyzer_from_phy(phy_path) -> SortingAnalyzer:
     print("Making a **recordingless** SortingAnalyzer")
     print("Reading the probe information...")
 
-
     probe = read_prb(phy_path/ "probe.prb")
 
     print("Reading the sorting...")
